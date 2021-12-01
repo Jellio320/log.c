@@ -27,9 +27,8 @@ log_trace("Hello %s", "world")
 Resulting in a line with the given format printed to stderr:
 
 ```
-20:18:26 TRACE src/main.c:11: Hello world
+[20:18:26][TRACE][Main Thread][src/main.c:11]: Hello world
 ```
-
 
 #### log_set_quiet(bool enable)
 Quiet-mode can be enabled by passing `true` to the `log_set_quiet()` function.
@@ -49,7 +48,7 @@ library by using the `log_add_fp()` function. The data written to the file
 output is of the following format:
 
 ```
-2047-03-11 20:18:26 TRACE src/main.c:11: Hello world
+[2047-03-11 20:18:26][TRACE][Main Thread][src/main.c:11]: Hello world
 ```
 
 Any messages below the given `level` are ignored. If the library failed to add a
