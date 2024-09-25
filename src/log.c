@@ -36,7 +36,13 @@ static struct {
     int level;
     bool quiet;
     Callback callbacks[MAX_CALLBACKS];
-} L;
+} L = {
+    .udata = NULL,
+    .lock = NULL,
+    .level = LOGC_TRACE,
+    .quiet = false,
+    .callbacks = { NULL }
+};
 
 static const char *level_strings[6] = {
     "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
@@ -91,22 +97,43 @@ void log_set_quiet(bool enable) {
     L.quiet = enable;
 }
 
-int log_add_callback(log_LogFn fn, void *udata, int level) {
+int log_get_max_callbacks(void) {
+    return MAX_CALLBACKS;
+}
+
+int log_push_callback(log_LogFn fn, void *udata, int level) {
     for (int i = 0; i < MAX_CALLBACKS; i++) {
-        if (!L.callbacks[i].fn) {
+        if(L.callbacks[i].fn)
+            continue;
+
             L.callbacks[i] = (Callback) { fn, udata, level };
-            return 1;
-        }
+        return i + 1;
     }
     return 0;
+}
+
+int log_pop_callback(void) {
+    for(int i = MAX_CALLBACKS - 1; i >= 0; i--) {
+        if(!L.callbacks[i].fn)
+            continue;
+        
+        L.callbacks[i] = (Callback) { NULL, NULL, 0 };
+        return i;
+    }
+
+    return 0;
+}
+
+int log_add_callback(log_LogFn fn, void *udata, int level) {
+    return log_push_callback(fn, udata, level);
 }
 
 static void file_callback(log_Event *ev) {
     char time[64];
     time[strftime(time, sizeof(time), "%Y-%m-%d %H:%M:%S", ev->time)] = 0;
 #ifdef LOG_USE_PTHREAD_NAMES
-    char thread[32] = "";
-    pthread_getname_np(ev->thread, thread, 32);
+    char thread[16] = "";
+    pthread_getname_np(ev->thread, thread, 16);
 #endif
     fprintf(ev->udata, "[%s][%-5s]" PTHREAD_NAME_FMT "[%s:%d] ", time, level_strings[ev->level], PTHREAD_NAME_VALUE ev->file, ev->line);
     vfprintf(ev->udata, ev->fmt, ev->ap);
@@ -115,7 +142,7 @@ static void file_callback(log_Event *ev) {
 }
 
 int log_add_fp(FILE *fp, int level) {
-    return log_add_callback(file_callback, fp, level);
+    return log_push_callback(file_callback, fp, level);
 }
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
@@ -143,8 +170,14 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
         va_end(ev.ap);
     }
 
-    for (Callback *cb = L.callbacks, *end = &L.callbacks[MAX_CALLBACKS]; cb != end && cb->fn; cb++) {
-        if (level >= cb->level) {
+    for (int i = 0; i < MAX_CALLBACKS; i++) {
+        Callback *cb = &L.callbacks[i];
+        if (cb->fn == NULL)
+            break;
+
+        if (level < cb->level)
+            continue;
+
             if (!ev.time) {
                 time_t t = time(NULL);
                 ev.time = localtime(&t);

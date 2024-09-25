@@ -20,7 +20,7 @@ extern "C" {
 #include <errno.h>
 #include <pthread.h>
 
-#define LOG_VERSION "0.2.0"
+#define LOG_VERSION "0.2.1"
 
 typedef struct log_Event {
     va_list ap;
@@ -56,6 +56,9 @@ const char *log_level_string(int level);
 void log_set_lock(log_LockFn fn, void *udata);
 void log_set_level(int level);
 void log_set_quiet(bool enable);
+int log_get_max_callbacks(void);
+int log_push_callback(log_LogFn fn, void *udata, int level);
+int log_pop_callback(void);
 int log_add_callback(log_LogFn fn, void *udata, int level);
 int log_add_fp(FILE *fp, int level);
 
